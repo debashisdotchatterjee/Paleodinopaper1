@@ -404,7 +404,7 @@ library(ggplot2)
 subset_data <- maindata[maindata$Centroid_Size > 50, ]
 
 # Define polynomial degree
-degree <- 10  # You can change the degree as needed
+degree <- 12  # You can change the degree as needed
 
 # Fit polynomial regression model
 poly_model <- lm(Footprint_Length_to_Center_of_Mass ~ poly(Centroid_Size, degree), data = subset_data)
@@ -433,7 +433,7 @@ mse <- function(true, pred) {
 }
 
 # Define a range of polynomial degrees to consider
-max_degree <- 10
+max_degree <- 16
 degrees <- 1:max_degree
 
 # Initialize vectors to store cross-validated error
@@ -554,6 +554,30 @@ posterior_plots <- lapply(names(posterior_samples_df), function(param) {
 
 # Combine plots
 grid.arrange(grobs = posterior_plots)
+###############
+#another Experiment
+#################
+
+library(ggplot2)
+library(gridExtra)
+
+# Convert posterior samples to data frame
+posterior_samples_df <- as.data.frame(fit)
+
+# Plot posterior distributions of model parameters
+posterior_plots <- lapply(names(posterior_samples_df), function(param) {
+  ggplot(posterior_samples_df, aes(x = .data[[param]])) +
+    geom_density(fill = "skyblue", color = "black") +
+    labs(title = paste("Posterior Distribution of", param),
+         x = param, y = "Density") +
+    theme_minimal() +
+    theme(plot.title = element_text(size = 8),
+          axis.title = element_text(size = 8),
+          axis.text = element_text(size = 8))
+})
+
+# Combine plots with adjusted size
+grid.arrange(grobs = posterior_plots, ncol = 2, widths = c(3, 3))
 
 ##Predictive Inferences
 
@@ -607,4 +631,111 @@ predictive_plot <- ggplot(prediction_df, aes(x = FL_CM_new, y = CS_predicted)) +
 # Display the plot
 print(predictive_plot)
 
+################################
+#BIC BASED OPTIMAL POLYNOMIAL REGRESSION FIT
+##############################
+# Load necessary libraries
+library(polynom)
+library(ggplot2)
 
+# Data
+maindata <- dinosaur_data[, c(ncol(dinosaur_data)-1, ncol(dinosaur_data))]
+colnames(maindata) <- c("Centroid_Size", "Footprint_Length_to_Center_of_Mass")
+
+# Function to fit polynomial regression and calculate BIC
+fit_polynomial <- function(data, degree) {
+  # Fit polynomial regression
+  fit <- lm(Footprint_Length_to_Center_of_Mass ~ poly(Centroid_Size, degree, raw = TRUE), data = data)
+  
+  # Calculate BIC
+  n <- nrow(data)
+  RSS <- sum(residuals(fit)^2)
+  k <- degree + 1  # Number of parameters including intercept
+  BIC <- n * log(RSS/n) + k * log(n)
+  
+  return(list(fit = fit, BIC = BIC))
+}
+
+# Perform polynomial regression fits for degrees 1 to 5
+degrees <- 1:15
+fits <- lapply(degrees, function(degree) fit_polynomial(maindata, degree))
+
+# Extract BIC values
+BIC_values <- sapply(fits, function(fit) fit$BIC)
+
+# Find optimal degree with minimum BIC
+optimal_degree <- degrees[which.min(BIC_values)]
+cat("Optimal Degree:", optimal_degree, "\n")
+
+# Plot BIC values
+ggplot(data.frame(Degree = degrees, BIC = BIC_values), aes(x = Degree, y = BIC)) +
+  geom_line() +
+  geom_point(color = "blue") +
+  labs(title = "BIC-based Optimal Polynomial Regression Fit",
+       x = "Degree of Polynomial", y = "BIC") +
+  theme_minimal()
+################
+#################
+
+#for CS>90 
+
+# Subset data where Centroid_Size is greater than 60
+subset_data <- maindata[maindata$Centroid_Size > 90, ]
+
+# Perform polynomial regression fits for degrees 1 to 5
+fits <- lapply(degrees, function(degree) fit_polynomial(subset_data, degree))
+
+# Extract BIC values
+BIC_values <- sapply(fits, function(fit) fit$BIC)
+
+# Find optimal degree with minimum BIC
+optimal_degree <- degrees[which.min(BIC_values)]
+cat("Optimal Degree:", optimal_degree, "\n")
+
+# Plot BIC values
+# Plot BIC values
+ggplot(data.frame(Degree = degrees, BIC = BIC_values), aes(x = Degree, y = BIC)) +
+  geom_line() +
+  geom_point(color = "blue") +
+  geom_vline(xintercept = optimal_degree, linetype = "dashed", color = "red") +  # Vertical line for optimal degree
+  annotate("text", x = optimal_degree, y = max(BIC_values), label = paste("Optimal Degree:", optimal_degree), vjust = -0.5, color = "red") +  # Text annotation for optimal degree
+  labs(title = "BIC-based Optimal Polynomial Regression Fit (CS > 60)",
+       x = "Degree of Polynomial", y = "BIC") +
+  theme_minimal()
+
+# Plot BIC values with optimal degree representation
+ggplot(data.frame(Degree = degrees, BIC = BIC_values), aes(x = Degree, y = BIC)) +
+  geom_line() +
+  geom_point(color = "blue") +
+  geom_vline(xintercept = optimal_degree, linetype = "dashed", color = "red", size = 1) +
+  annotate("text", x = optimal_degree + 0.2, y = max(BIC_values), label = paste("Optimal Degree:", optimal_degree), color = "red", size = 5, hjust = 0) +
+  labs(title = "BIC-based Optimal Polynomial Regression Fit (CS > 90)",
+       x = "Degree of Polynomial", y = "BIC") +
+  theme_minimal() +
+  theme(plot.title = element_text(size = 12))  # Adjust
+
+####Draw with degree 5
+library(ggplot2)
+
+# Partition the dataset where CS > 50
+subset_data <- maindata[maindata$Centroid_Size > 50, ]
+
+# Define polynomial degree
+degree <- 5  # You can change the degree as needed
+
+# Fit polynomial regression model
+poly_model <- lm(Footprint_Length_to_Center_of_Mass ~ poly(Centroid_Size, degree), data = subset_data)
+
+# Plot the polynomial regression model
+newdata <- data.frame(Centroid_Size = seq(min(subset_data$Centroid_Size), max(subset_data$Centroid_Size), length.out = 100))
+pred <- predict(poly_model, newdata = newdata)
+ggplot(subset_data, aes(x = Centroid_Size, y = Footprint_Length_to_Center_of_Mass)) +
+  geom_point() +
+  geom_line(data = newdata, aes(y = pred), color = "blue") +
+  labs(x = "Centroid Size (CS)", y = "Footprint Length to Center of Mass (FL_CM)",
+       title = paste("Polynomial Regression Analysis (Degree", degree, ") for CS > 90"),
+       caption = "Fitted polynomial regression line") +
+  theme_minimal()+
+  theme(plot.title = element_text(size = 12))  # Adjust
+
+#############################
